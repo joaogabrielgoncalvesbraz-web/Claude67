@@ -10,7 +10,7 @@ self.addEventListener("push", (event) => {
     if (wins.some((w) => w.visibilityState === "visible" && w.focused)) return; // já está olhando o Zap
     await self.registration.showNotification(d.title || "Zap da Galera", {
       body: d.body || "Nova mensagem", tag: d.tag, renotify: true, icon: "/icon-192.png", badge: "/icon-192.png",
-      data: { chat: d.chat },
+      data: { chat: d.chat }, requireInteraction: !!d.call, vibrate: d.call ? [400, 200, 400, 200, 400] : undefined,
     });
   })());
 });
