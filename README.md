@@ -152,3 +152,9 @@ Se algo falhar nesses pontos, a mensagem de erro aparece em português na tela (
 - **Mensagens não aparecem sozinhas** → confira se o SQL rodou (ele adiciona as tabelas ao Realtime). Mesmo sem Realtime o app atualiza o estado a cada 20 s.
 - **IA não responde** → abra Participantes: o motivo aparece embaixo de cada IA (sem chave, sem modelo, limite atingido, desativada…).
 - **Erro 429** do provedor → sem créditos ou limite da conta de API.
+
+---
+
+## 💬 Zap da Galera (pasta `zap-da-galera/`)
+
+Um "WhatsApp" só da turma, no mesmo visual, sem IA. É um site separado que pode usar o mesmo Supabase deste projeto (tabelas `zap_*`) e as mesmas contas. Passo a passo em [`zap-da-galera/README.md`](zap-da-galera/README.md).

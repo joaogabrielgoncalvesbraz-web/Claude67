@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Zap da Galera</title>
+<meta name="theme-color" content="#0b0d14">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE: o mesmo chat escuro e divertido do AI FRIENDS, só que entre amigos.
+   IDEA: um WhatsApp da turma — lista de conversas + conversa aberta.
+   PICTURE: a própria conversa, com bolhas, avatares de emoji e anéis coloridos.
+   COLOUR/TYPE: fundo #0b0d14, cartões #171b2b, roxo de destaque (tema trocável), Inter.
+   LAYOUT: duas colunas no PC; no celular uma tela por vez. */
+:root{--accent:124 92 255;--accent-soft:162 139 255;--bg:#0b0d14;--soft:#121522;--card:#171b2b;--hover:#1f2438;--line:#262b40;--ink:#e7e9f3;--mute:#8b90a8;color-scheme:dark}
+[data-accent=azul]{--accent:59 130 246;--accent-soft:147 197 253}
+[data-accent=verde]{--accent:34 197 94;--accent-soft:134 239 172}
+[data-accent=laranja]{--accent:249 115 22;--accent-soft:253 186 116}
+[data-accent=rosa]{--accent:236 72 153;--accent-soft:249 168 212}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden;
+ background-image:radial-gradient(900px 500px at 10% -10%,rgb(var(--accent)/.12),transparent 60%),radial-gradient(700px 400px at 110% 10%,rgba(34,197,94,.06),transparent 60%)}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+:focus-visible{outline:2px solid rgb(var(--accent-soft));outline-offset:2px}
+.app{display:grid;grid-template-columns:minmax(280px,380px) 1fr;height:100dvh}
+aside{border-right:1px solid var(--line);display:flex;flex-direction:column;background:rgb(18 21 34/.7)}
+main{display:flex;flex-direction:column;position:relative}
+.top{display:flex;align-items:center;gap:10px;padding:12px 14px;padding-top:max(12px,env(safe-area-inset-top));border-bottom:1px solid var(--line);background:rgb(11 13 20/.85);min-height:64px}
+.brand{font-weight:800;font-size:20px;letter-spacing:-.02em;flex:1}
+.brand span{color:rgb(var(--accent-soft))}
+.ib{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:20px}
+.ib:hover{background:var(--hover)}
+.search{margin:10px 12px;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:0 12px}
+.search input{flex:1;background:none;border:0;outline:0;height:42px;font-size:16px}
+.list{flex:1;overflow-y:auto;padding:4px 6px}
+.row{display:flex;gap:12px;align-items:center;width:100%;text-align:left;padding:10px;border-radius:14px}
+.row:hover{background:var(--hover)}.row.on{background:var(--card)}
+.av{width:48px;height:48px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:24px;border:2.5px solid var(--c,#555);background:var(--soft);position:relative}
+.av.sm{width:38px;height:38px;font-size:19px;border-width:2px}
+.av img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
+.av:has(img){background:none}
+.av .dot{position:absolute;right:-1px;bottom:-1px;width:13px;height:13px;border-radius:50%;background:#22c55e;border:2.5px solid var(--bg)}
+.rt{flex:1;display:grid;gap:2px}
+.rt b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rt small{color:var(--mute);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rt small.ty{color:#22c55e;font-style:italic}
+.rm{display:grid;justify-items:end;gap:5px;font-size:12px;color:var(--mute)}
+.badge{background:rgb(var(--accent));color:#fff;border-radius:10px;font-size:11px;font-weight:700;padding:2px 7px}
+.rm.new{color:rgb(var(--accent-soft))}
+.hint{margin:14px;padding:14px;border:1px dashed var(--line);border-radius:14px;color:var(--mute);font-size:14px}
+.chat-bg{background-image:radial-gradient(rgba(255,255,255,.025) 1px,transparent 1px);background-size:18px 18px}
+.msgs{flex:1;min-height:0;overflow-y:auto;padding:14px clamp(10px,3vw,28px) 8px;display:flex;flex-direction:column;gap:3px}
+.who{flex:1;display:grid;text-align:left}
+.who b{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who small{color:var(--mute);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who small.ty{color:#22c55e}
+.back{display:none}
+.m{display:flex;gap:9px;align-items:flex-end;max-width:min(78%,620px)}
+.m.nw{animation:pop .18s ease-out}
+.m.me .av{display:none}
+.m.me{align-self:flex-end;flex-direction:row-reverse}
+.m.gap{margin-top:9px}
+.m .av{visibility:hidden}.m.first .av{visibility:visible}
+.b{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:8px 12px 6px;position:relative;cursor:pointer;text-align:left;overflow-wrap:anywhere}
+.m.me .b{background:rgb(var(--accent)/.2);border-color:rgb(var(--accent)/.45)}
+.m.first:not(.me) .b{border-bottom-left-radius:6px}.m.first.me .b{border-bottom-right-radius:6px}
+.nm{font-weight:700;font-size:14px;color:var(--c)}
+.tx{white-space:pre-wrap;font-size:15.5px}
+.tx.del{color:var(--mute);font-style:italic}
+.tx a{color:rgb(var(--accent-soft))}
+.mn{background:rgb(var(--accent)/.25);color:rgb(var(--accent-soft));border-radius:6px;padding:0 3px;font-weight:600}
+.meta{display:flex;justify-content:flex-end;gap:4px;font-size:11.5px;color:var(--mute);margin-top:2px;white-space:nowrap}
+.tick.read{color:#38bdf8}
+.q{border-left:3px solid var(--c,#22c55e);background:rgb(0 0 0/.25);border-radius:8px;padding:5px 9px;margin:4px 0 5px;font-size:13.5px}
+.q b{color:var(--c);font-size:13px;display:block}
+.q span{color:#c4c7d8;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.rx{display:flex;gap:4px;flex-wrap:wrap;margin-top:-6px;padding:0 8px;position:relative;z-index:1}
+.m.me .rx{justify-content:flex-end}
+.rx button{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:1px 7px;font-size:13px}
+.rx button.mine{border-color:rgb(var(--accent));background:rgb(var(--accent)/.2)}
+.day{align-self:center;background:var(--card);border:1px solid var(--line);color:var(--mute);font-size:12.5px;border-radius:10px;padding:4px 12px;margin:12px 0 6px}
+.sys{align-self:center;max-width:90%;text-align:center;background:var(--soft);border:1px solid var(--line);border-radius:14px;padding:8px 14px;color:var(--mute);font-size:13.5px;margin:8px 0}
+.compose{border-top:1px solid var(--line);background:rgb(11 13 20/.9);padding:8px 10px;padding-bottom:max(8px,env(safe-area-inset-bottom))}
+.rep{display:flex;align-items:center;gap:8px;margin:0 2px 8px}
+.rep .q{flex:1;margin:0}
+.cb{display:flex;align-items:flex-end;gap:6px}
+.cb textarea{flex:1;resize:none;max-height:140px;min-height:46px;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:11px 16px;font-size:16px;outline:0}
+.cb textarea:focus{border-color:rgb(var(--accent)/.6)}
+.send{width:48px;height:48px;border-radius:50%;background:rgb(var(--accent));color:#fff;font-size:19px;display:grid;place-items:center;flex:none}
+.send:disabled{opacity:.4}
+.emo{display:none;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:2px;max-height:180px;overflow-y:auto;padding:6px;margin-bottom:8px;background:var(--card);border:1px solid var(--line);border-radius:14px}
+.emo.on{display:grid}.emo button{height:40px;font-size:22px;border-radius:8px}.emo button:hover{background:var(--hover)}
+.empty{flex:1;display:grid;place-items:center;text-align:center;padding:30px;color:var(--mute)}
+.empty .big{font-size:64px}.empty h2{color:var(--ink);font-size:26px;margin:8px 0 4px;letter-spacing:-.02em}
+.menu{position:fixed;z-index:30;background:var(--soft);border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 50px rgb(0 0 0/.55);padding:6px;width:220px;display:none}
+.menu.on{display:block}
+.menu .re{display:flex;justify-content:space-between;padding:4px 2px 8px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.menu .re button{font-size:22px;width:32px;height:36px;border-radius:8px}.menu .re button:hover{background:var(--hover);transform:scale(1.15)}
+.menu .it{display:block;width:100%;text-align:left;padding:10px 12px;border-radius:10px}.menu .it:hover{background:var(--hover)}
+.menu .it.red{color:#f87171}
+.veil{position:fixed;inset:0;background:rgb(0 0 0/.6);z-index:40;display:none;place-items:center;padding:16px}
+.veil.on{display:grid}
+.dlg{background:var(--soft);border:1px solid var(--line);border-radius:20px;width:min(440px,100%);max-height:88dvh;display:flex;flex-direction:column;overflow:hidden}
+.dlg h3{margin:0;padding:16px 18px;border-bottom:1px solid var(--line);font-size:18px;display:flex;justify-content:space-between;align-items:center}
+.dlg .bd{padding:14px 18px;overflow-y:auto;display:grid;gap:12px}
+.dlg .ft{padding:12px 18px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}.dlg .ft .btn{white-space:nowrap}
+label.f{display:grid;gap:5px;font-size:13px;color:var(--mute)}
+.f input{background:var(--card);border:1px solid var(--line);border-radius:12px;height:44px;padding:0 12px;font-size:16px;outline:0;color:var(--ink)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{width:42px;height:42px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-size:21px}
+.chips button.on{border-color:rgb(var(--accent));background:rgb(var(--accent)/.2)}
+.chips .sw{border-radius:50%;width:34px;height:34px}
+.chips .sw.on{outline:3px solid #fff;outline-offset:2px}
+.btn{height:44px;padding:0 18px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-weight:600}
+.btn.pri{background:rgb(var(--accent));border-color:transparent;color:#fff}
+.btn.red{color:#f87171}
+.pick{display:flex;align-items:center;gap:12px;padding:8px;border-radius:12px;width:100%;text-align:left}
+.pick:hover{background:var(--hover)}.pick input{width:20px;height:20px;accent-color:rgb(var(--accent))}
+.banner{background:rgb(234 179 8/.12);color:#fde68a;border-bottom:1px solid rgb(234 179 8/.3);padding:8px 14px;font-size:13.5px}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--card);border:1px solid var(--line);padding:10px 16px;border-radius:12px;z-index:50;display:none;font-size:14px}
+.toast.on{display:block}
+.msgs::-webkit-scrollbar,.list::-webkit-scrollbar{width:6px}.msgs::-webkit-scrollbar-thumb,.list::-webkit-scrollbar-thumb{background:#2a3050;border-radius:6px}
+@keyframes pop{0%{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.m.nw{animation:none}}
+@media (max-width:760px){
+ .app{grid-template-columns:1fr}
+ main{display:none}
+ body.open aside{display:none}body.open main{display:flex}
+ .back{display:grid}
+ .m{max-width:88%}
+}
+.auth{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:20px;background:var(--bg);
+ background-image:radial-gradient(900px 500px at 10% -10%,rgb(var(--accent)/.18),transparent 60%),radial-gradient(700px 400px at 110% 10%,rgba(34,197,94,.08),transparent 60%)}
+.auth.off{display:none}
+.card{width:min(400px,100%);background:var(--soft);border:1px solid var(--line);border-radius:22px;padding:26px 22px;display:grid;gap:14px;box-shadow:0 30px 80px rgb(0 0 0/.45)}
+.card h1{margin:0;font-size:34px;letter-spacing:-.03em;line-height:1.05}.card h1 span{color:rgb(var(--accent-soft))}
+.card p{margin:0;color:var(--mute)}
+.tabs{display:grid;grid-template-columns:1fr 1fr;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px}
+.tabs button{height:40px;border-radius:9px;font-weight:600;color:var(--mute)}.tabs button.on{background:rgb(var(--accent));color:#fff}
+.err{color:#fca5a5;font-size:14px;min-height:1.2em}
+.big-bubbles{display:flex;gap:8px;font-size:30px}
+</style>
+</head>
+<body>
+<div class="auth" id="auth"><form class="card" id="authForm" autocomplete="on">
+ <div class="big-bubbles" aria-hidden="true">💬🔥😂</div>
+ <h1>Zap <span>da Galera</span></h1>
+ <p>O chat só da turma. Entre com seu usuário e senha. Quem tem conta no AI FRIENDS usa a mesma.</p>
+ <div class="tabs" role="tablist"><button type="button" class="on" data-mode="in">Entrar</button><button type="button" data-mode="up">Criar conta</button></div>
+ <label class="f">Usuário<input id="aUser" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="20" placeholder="ex.: jg" required></label>
+ <label class="f">Senha<input id="aPass" name="password" type="password" autocomplete="current-password" maxlength="72" placeholder="mínimo 8 caracteres" required></label>
+ <div class="err" id="aErr" role="alert"></div>
+ <button class="btn pri" id="aGo" style="height:48px;font-size:16px">Entrar</button>
+</form></div>
+<div class="app">
+ <aside>
+  <div class="top">
+   <div class="brand">Zap <span>da Galera</span></div>
+   <button class="ib" id="joinBtn" aria-label="Entrar com código" title="Entrar com código">🔑</button>
+   <button class="ib" id="newBtn" aria-label="Nova conversa" title="Nova conversa">✏️</button>
+   <button class="ib" id="meBtn" aria-label="Meu perfil" title="Meu perfil"><span class="av sm" id="meAv" style="width:34px;height:34px;font-size:17px">🙂</span></button>
+  </div>
+  <div id="banner"></div>
+  <div class="search"><span>🔍</span><input id="q" placeholder="Pesquisar conversa" aria-label="Pesquisar conversa"></div>
+  <div class="list" id="list"><div class="hint">Carregando conversas…</div></div>
+ </aside>
+ <main class="chat-bg" id="main">
+  <div class="empty"><div><div class="big">💬</div><h2>Só a galera aqui</h2><p>Escolha uma conversa ou toque em ✏️ pra começar uma nova.<br>Sem IA nenhuma: só vocês.</p></div></div>
+ </main>
+</div>
+
+<div class="menu" id="menu" role="menu">
+ <div class="re" id="reBar"></div>
+ <button class="it" data-a="reply">↩️ Responder</button>
+ <button class="it" data-a="copy">📋 Copiar</button>
+ <button class="it red" data-a="del">🗑️ Apagar pra todos</button>
+</div>
+<div class="veil" id="veil"><div class="dlg" id="dlg"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+{
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const COLORS=['#22c55e','#f59e0b','#3b82f6','#ec4899','#a78bfa','#14b8a6','#ef4444','#eab308','#06b6d4','#f97316'];
+const AVS=['😎','🦊','👑','🐸','🐼','🔥','⚽','🎮','🐯','🤠','👽','🦁','🐺','🤖','🍕','🎧','🃏','👀','🦈','🐵'];
+const GEMO=['👥','🔥','⚽','🎮','🍕','🎉','💀','😂','🏖️','📚','💈','🚗'];
+const REACT=['👍','❤️','😂','😮','😢','🙏'];
+const KB='😀 😂 🤣 😅 😊 😍 😘 😎 🤔 😴 😭 😡 🥶 🤯 🥳 😏 🙄 😬 🤡 💀 👍 👎 👏 🙌 🙏 💪 🤝 ✌️ 🤙 👀 ❤️ 💜 🔥 ✨ 💯 ⚽ 🎮 🍕 🍔 🍻 🎉 🚗 🏆 📸 💈 ✅ ❌'.split(' ');
+const ACC=['roxo','azul','verde','laranja','rosa'],ACCC={roxo:'#7c5cff',azul:'#3b82f6',verde:'#22c55e',laranja:'#f97316',rosa:'#ec4899'};
+let sb=null,DOMAIN='users.aifriends.local',me=null,live=null,pres=null,started=false;
+const S={people:{},chats:[],cur:null,msgs:[],reads:{},my:{},peers:[],reply:null,q:'',seen:new Set()};
+let typingT=null,typingOn=false,readT=null,menuId=null,chatsT=null;
+
+try{const a=localStorage.getItem('zap-accent');if(a)document.documentElement.dataset.accent=a}catch(e){}
+
+const toast=t=>{const el=$('#toast');el.textContent=t;el.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('on'),2800)};
+const errMsg=(e,f)=>{const m=String(e?.message||'');return /JWT|auth|token/i.test(m)?'Sua sessão expirou. Entre de novo.':(m&&!/fetch|network/i.test(m)&&m.length<120?m:f)};
+const ms=t=>t?Date.parse(t):0;
+const okPhoto=s=>typeof s==='string'&&s.length<250000&&/^data:image\/(jpeg|webp|png);base64,[A-Za-z0-9+/=]+$/.test(s);
+const face=(emoji,photo)=>okPhoto(photo)?`<img src="${photo}" alt="">`:esc(emoji);
+const person=id=>S.people[id]||{emoji:'🙂',color:'#64748b'};
+const nameOf=id=>id===me?'Você':(person(id).nick||person(id).username||'Alguém');
+const chat=id=>S.chats.find(c=>c.id===id);
+const others=c=>c.members.filter(x=>x!==me);
+const hm=t=>new Date(t).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+const dayKey=t=>new Date(t).toDateString();
+function dayLabel(t){const d=new Date(t),n=new Date(),y=new Date(Date.now()-864e5);
+ if(d.toDateString()===n.toDateString())return'Hoje';if(d.toDateString()===y.toDateString())return'Ontem';
+ return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:d.getFullYear()===n.getFullYear()?undefined:'numeric'})}
+function listTime(t){if(!t)return'';const d=new Date(t);if(d.toDateString()===new Date().toDateString())return hm(t);
+ return dayLabel(t)==='Ontem'?'Ontem':d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}
+function chatLook(c){
+ if(c.group)return{emoji:c.emoji||'👥',color:'rgb(var(--accent))',name:c.name||'Grupo'};
+ const o=others(c)[0];if(!o)return{emoji:'👻',color:'#64748b',name:'Conversa vazia'};
+ const p=person(o);return{emoji:p.emoji,photo:p.photo,color:p.color,name:nameOf(o),uid:o};
+}
+const online=()=>new Set(S.peers.filter(p=>p.uid&&p.uid!==me).map(p=>p.uid));
+function typers(cid){const s=new Set();for(const p of S.peers)if(p.uid&&p.uid!==me&&p.typing===cid&&Date.now()-(p.tt||0)<8000)s.add(p.uid);return[...s]}
+function fmt(t){let h=esc(t);
+ h=h.replace(/https?:\/\/[^\s<]+/g,u=>/^https:/.test(u)?`<a href="${u}" target="_blank" rel="noopener">${u}</a>`:u);
+ return h.replace(/(^|\s)@([\wÀ-ÿ]+)/g,(m,a,b)=>`${a}<span class="mn">@${b}</span>`)}
+
+/* ---------- login ---------- */
+let mode='in';
+$('#authForm').querySelector('.tabs').onclick=e=>{const b=e.target.closest('[data-mode]');if(!b)return;mode=b.dataset.mode;
+ document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+ $('#aGo').textContent=mode==='in'?'Entrar':'Criar conta';$('#aPass').autocomplete=mode==='in'?'current-password':'new-password';$('#aErr').textContent=''};
+$('#authForm').onsubmit=async e=>{e.preventDefault();if(!sb)return $('#aErr').textContent='O site ainda está conectando…';
+ const u=$('#aUser').value.trim().toLowerCase(),p=$('#aPass').value;$('#aErr').textContent='';
+ if(!/^[a-z0-9_]{2,20}$/.test(u))return $('#aErr').textContent='Usuário: 2 a 20 letras minúsculas, números ou _';
+ if(p.length<8)return $('#aErr').textContent='A senha precisa ter pelo menos 8 caracteres.';
+ const go=$('#aGo');go.disabled=true;go.textContent=mode==='in'?'Entrando…':'Criando…';
+ try{
+  if(mode==='up'){const r=await fetch('/api/signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+   const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Não deu pra criar a conta.')}
+  const{error}=await sb.auth.signInWithPassword({email:u+'@'+DOMAIN,password:p});
+  if(error)throw new Error(mode==='in'?'Usuário ou senha incorretos.':'Conta criada, mas não consegui entrar. Tente em Entrar.');
+ }catch(er){$('#aErr').textContent=er.message}
+ go.disabled=false;go.textContent=mode==='in'?'Entrar':'Criar conta'};
+
+/* ---------- dados ---------- */
+async function loadPeople(ids){
+ const need=[...new Set(ids)].filter(id=>id&&!S.people[id]);if(!need.length)return false;
+ const{data}=await sb.from('zap_profiles').select('id,username,nick,emoji,color,about,photo,code,seen').in('id',need);
+ (data||[]).forEach(p=>S.people[p.id]=p);return!!(data&&data.length)}
+async function loadChats(){
+ const{data:mine,error}=await sb.from('zap_members').select('chat_id,last_read_at').eq('user_id',me);
+ if(error)throw error;
+ const ids=mine.map(r=>r.chat_id);S.my={};mine.forEach(r=>S.my[r.chat_id]=ms(r.last_read_at));
+ if(!ids.length){S.chats=[];renderList();return}
+ const[{data:cs},{data:mem}]=await Promise.all([sb.from('zap_chats').select('*').in('id',ids),sb.from('zap_members').select('chat_id,user_id,role,last_read_at').in('chat_id',ids)]);
+ S.chats=(cs||[]).map(c=>{const ms_=(mem||[]).filter(m=>m.chat_id===c.id);
+  return{id:c.id,group:c.is_group,name:c.name,emoji:c.emoji,code:c.code,members:ms_.map(m=>m.user_id),admins:ms_.filter(m=>m.role==='admin').map(m=>m.user_id),
+   readsAll:Object.fromEntries(ms_.map(m=>[m.user_id,ms(m.last_read_at)])),lastAt:ms(c.last_at),last:c.last_text!=null?{by:c.last_by,text:c.last_text}:null}});
+ await loadPeople(S.chats.flatMap(c=>c.members));
+ if(S.cur){const c=chat(S.cur);if(c)S.reads=c.readsAll;else{closeChat();toast('Você não está mais nessa conversa.')}}
+ renderList();renderHead();renderMsgs(false);
+}
+const refreshChats=()=>{clearTimeout(chatsT);chatsT=setTimeout(()=>loadChats().catch(()=>{}),250)};
+const toMsg=r=>({id:r.id,by:r.user_id,text:r.text,at:ms(r.created_at),reply:r.reply,react:r.reactions||{},del:r.deleted,sys:r.sys});
+
+/* ---------- lista ---------- */
+function renderList(){
+ const el=$('#list'),on=online(),q=S.q.toLowerCase();
+ let cs=[...S.chats].sort((a,b)=>(b.lastAt||0)-(a.lastAt||0));
+ if(q)cs=cs.filter(c=>chatLook(c).name.toLowerCase().includes(q));
+ let h=cs.map(c=>{const L=chatLook(c),ty=typers(c.id),unread=(c.lastAt||0)>(S.my[c.id]||0)&&c.last&&c.last.by!==me;
+  const sub=ty.length?`<small class="ty">${esc(c.group?nameOf(ty[0])+' está digitando…':'digitando…')}</small>`
+   :`<small>${c.last?esc((c.last.by===me?'Você: ':c.group?nameOf(c.last.by)+': ':'')+c.last.text):'<i>Nenhuma mensagem ainda</i>'}</small>`;
+  return`<button class="row${c.id===S.cur?' on':''}" data-c="${esc(c.id)}"><span class="av" style="--c:${esc(L.color)}">${face(L.emoji,L.photo)}${L.uid&&on.has(L.uid)?'<i class="dot"></i>':''}</span>
+  <span class="rt"><b>${esc(L.name)}</b>${sub}</span><span class="rm${unread?' new':''}">${esc(listTime(c.lastAt))}${unread?'<span class="badge">nova</span>':''}</span></button>`}).join('');
+ if(!cs.length)h+=`<div class="hint">${q?'Nenhuma conversa com esse nome.':'👋 Nenhuma conversa ainda.<br><br>• Toque em <b>🔑</b> e cole o código de um grupo ou de um amigo.<br>• Ou toque em <b>✏️</b> pra criar um grupo e mandar o código pra galera.'}</div>`;
+ el.innerHTML=h;
+}
+
+/* ---------- conversa ---------- */
+function closeChat(){S.cur=null;S.msgs=[];document.body.classList.remove('open');
+ $('#main').innerHTML='<div class="empty"><div><div class="big">💬</div><h2>Só a galera aqui</h2><p>Escolha uma conversa ou toque em ✏️ pra começar uma nova.<br>Sem IA nenhuma: só vocês.</p></div></div>'}
+async function openChat(id){
+ if(S.cur===id){document.body.classList.add('open');return}
+ const c=chat(id);if(!c)return;
+ S.cur=id;S.msgs=[];S.reads=c.readsAll||{};S.reply=null;S.seen=new Set();
+ $('#main').innerHTML=`<div class="top"><button class="ib back" id="back" aria-label="Voltar">←</button><span class="av sm" id="hAv"></span>
+  <button class="who" id="who"><b id="hName"></b><small id="hSub"></small></button><button class="ib" id="info" aria-label="Detalhes">⋮</button></div>
+  <div class="msgs" id="msgs"><div class="sys">Carregando mensagens…</div></div>
+  <div class="compose"><div id="rep"></div><div class="emo" id="emo">${KB.map(e=>`<button data-e="${e}">${e}</button>`).join('')}</div>
+  <div class="cb"><button class="ib" id="emoBtn" aria-label="Emojis">😊</button>
+  <textarea id="tx" rows="1" placeholder="Mensagem" aria-label="Mensagem"></textarea>
+  <button class="send" id="sendBtn" aria-label="Enviar" disabled>➤</button></div></div>`;
+ document.body.classList.add('open');renderHead();renderList();
+ const{data,error}=await sb.from('zap_messages').select('*').eq('chat_id',id).order('created_at',{ascending:false}).limit(300);
+ if(S.cur!==id)return;
+ if(error){$('#msgs').innerHTML='<div class="sys">Não consegui carregar as mensagens.</div>';return}
+ S.msgs=data.map(toMsg).reverse();await loadPeople(S.msgs.map(m=>m.by));renderMsgs(true);markRead();
+ setTimeout(()=>matchMedia('(min-width:761px)').matches&&$('#tx')?.focus(),50);
+}
+function renderHead(){
+ const c=chat(S.cur);if(!c||!$('#hName'))return;const L=chatLook(c),ty=typers(c.id),on=online();
+ const av=$('#hAv');av.innerHTML=face(L.emoji,L.photo);av.style.setProperty('--c',L.color);
+ $('#hName').textContent=L.name;const sub=$('#hSub');sub.className='';
+ if(ty.length){sub.className='ty';sub.textContent=c.group?ty.map(nameOf).join(', ')+' digitando…':'digitando…'}
+ else if(c.group)sub.textContent=[me,...others(c)].map(nameOf).join(', ');
+ else if(L.uid&&on.has(L.uid))sub.textContent='online';
+ else if(L.uid&&person(L.uid).seen){const t=ms(person(L.uid).seen);sub.textContent='visto por último '+dayLabel(t).toLowerCase()+' às '+hm(t)}
+ else sub.textContent='';
+}
+const isNear=()=>{const m=$('#msgs');return!m||m.scrollHeight-m.scrollTop-m.clientHeight<120};
+function tick(m,c){
+ if(m._p)return'<span class="tick">🕓</span>';
+ const os=others(c);if(!os.length)return'<span class="tick">✓</span>';
+ const r=os.filter(o=>(S.reads[o]||0)>=m.at).length;
+ return r===os.length?'<span class="tick read">✓✓</span>':r?'<span class="tick">✓✓</span>':'<span class="tick">✓</span>';
+}
+function renderMsgs(stick){
+ const el=$('#msgs'),c=chat(S.cur);if(!el||!c)return;
+ const top=el.scrollTop;let h='',prev=null,lastDay='';
+ if(!S.msgs.length)h=`<div class="sys">Mande a primeira mensagem 👋</div>`;
+ for(const m of S.msgs){
+  if(dayKey(m.at)!==lastDay){lastDay=dayKey(m.at);h+=`<div class="day">${esc(dayLabel(m.at))}</div>`;prev=null}
+  if(m.sys){h+=`<div class="sys">${esc(nameOf(m.by))} ${esc(m.text)}</div>`;prev=null;continue}
+  const mine=m.by===me,p=person(m.by),first=!prev||prev.by!==m.by||m.at-prev.at>3e5;
+  let body='';
+  if(c.group&&!mine&&first)body+=`<div class="nm" data-pv="${esc(m.by)}" title="Conversar no privado" style="--c:${esc(p.color)};cursor:pointer">${esc(nameOf(m.by))}</div>`;
+  if(m.reply&&!m.del){const rp=person(m.reply.by);body+=`<div class="q" style="--c:${esc(rp.color)}"><b>${esc(nameOf(m.reply.by))}</b><span>${esc(m.reply.text)}</span></div>`}
+  body+=m.del?'<div class="tx del">🚫 Mensagem apagada</div>':`<div class="tx">${fmt(m.text)}</div>`;
+  body+=`<div class="meta">${esc(hm(m.at))}${mine&&!m.del?tick(m,c):''}</div>`;
+  const rx={};for(const[u,e]of Object.entries(m.react||{}))if(e)(rx[e]=rx[e]||[]).push(u);
+  const rxh=Object.entries(rx).map(([e,us])=>`<button data-rx="${esc(e)}" data-m="${esc(m.id)}" class="${us.includes(me)?'mine':''}" title="${esc(us.map(nameOf).join(', '))}">${esc(e)} ${us.length>1?us.length:''}</button>`).join('');
+  const nw=S.seen.size&&!S.seen.has(m.id);
+  h+=`<div class="m${nw?' nw':''}${mine?' me':''}${first?' first':''}${first&&prev?' gap':''}"><span class="av sm" ${c.group&&!mine?`data-pv="${esc(m.by)}" title="Conversar no privado" style="--c:${esc(p.color)};cursor:pointer"`:`style="--c:${esc(p.color)}"`}>${face(p.emoji,p.photo)}</span>
+   <div><div class="b" data-m="${esc(m.id)}" tabindex="0">${body}</div>${rxh?`<div class="rx">${rxh}</div>`:''}</div></div>`;
+  prev=m;
+ }
+ el.innerHTML=h;S.msgs.forEach(m=>S.seen.add(m.id));if(!S.seen.size)S.seen.add('_');
+ if(stick)el.scrollTop=el.scrollHeight;else el.scrollTop=top;
+}
+function renderReply(){
+ const r=$('#rep');if(!r)return;if(!S.reply){r.innerHTML='';return}
+ const p=person(S.reply.by);
+ r.innerHTML=`<div class="rep"><div class="q" style="--c:${esc(p.color)}"><b>${esc(nameOf(S.reply.by))}</b><span>${esc(S.reply.text)}</span></div><button class="ib" id="noRep" aria-label="Cancelar resposta">✕</button></div>`;
+}
+function markRead(){
+ clearTimeout(readT);readT=setTimeout(async()=>{
+  const c=chat(S.cur);if(!c||document.hidden)return;
+  if((S.my[c.id]||0)>=(c.lastAt||0))return;
+  S.my[c.id]=c.lastAt;renderList();try{await sb.rpc('zap_read',{cid:c.id})}catch(e){}
+ },500);
+}
+async function send(){
+ const tx=$('#tx'),text=tx.value.trim(),c=chat(S.cur);if(!text||!c)return;
+ tx.value='';grow();$('#sendBtn').disabled=true;$('#emo').classList.remove('on');
+ const reply=S.reply;S.reply=null;renderReply();setTyping(false);
+ const tmp={id:'tmp'+Date.now(),by:me,text,at:Date.now(),reply:reply&&{id:reply.id,by:reply.by,text:reply.text},react:{},del:false,_p:true};
+ S.msgs.push(tmp);renderMsgs(true);
+ const{data,error}=await sb.rpc('zap_send',{cid:c.id,p_text:text,p_reply:reply?.id||null});
+ S.msgs=S.msgs.filter(m=>m!==tmp);
+ if(error){tx.value=text;grow();renderMsgs(true);return toast(errMsg(error,'Não consegui enviar. Tenta de novo.'))}
+ const m=toMsg(data);if(!S.msgs.some(x=>x.id===m.id))S.msgs.push(m);
+ c.last={by:me,text:text.slice(0,140)};c.lastAt=m.at;S.my[c.id]=m.at;renderMsgs(true);renderList();
+}
+function grow(){const t=$('#tx');if(!t)return;t.style.height='auto';t.style.height=Math.min(t.scrollHeight,140)+'px';$('#sendBtn').disabled=!t.value.trim()}
+function setTyping(on){if(!pres)return;if(on!==typingOn){typingOn=on;pres.track({uid:me,typing:on?S.cur:null,tt:Date.now()}).catch(()=>{})}
+ clearTimeout(typingT);if(on)typingT=setTimeout(()=>setTyping(false),3000)}
+
+/* ---------- tempo real ---------- */
+function startLive(){
+ live=sb.channel('zap-db')
+  .on('postgres_changes',{event:'*',schema:'public',table:'zap_messages'},async pl=>{
+   const r=pl.new&&pl.new.id?pl.new:null;if(!r)return;
+   if(r.chat_id===S.cur){const m=toMsg(r),i=S.msgs.findIndex(x=>x.id===m.id);const near=isNear();
+    if(i>=0)S.msgs[i]=m;else{S.msgs.push(m);S.msgs.sort((a,b)=>a.at-b.at)}
+    if(await loadPeople([m.by]))renderList();renderMsgs(near||m.by===me);markRead()}
+   if(pl.eventType==='INSERT'){const c=chat(r.chat_id);if(c){c.last={by:r.user_id,text:r.sys?r.text:r.text.slice(0,140)};c.lastAt=ms(r.created_at);renderList()}
+    if(r.sys||!c)refreshChats()}})
+  .on('postgres_changes',{event:'*',schema:'public',table:'zap_members'},pl=>{
+   const r=pl.new&&pl.new.chat_id?pl.new:pl.old;
+   if(pl.eventType==='UPDATE'&&r){const c=chat(r.chat_id);if(c){c.readsAll[r.user_id]=ms(r.last_read_at);if(r.user_id===me)S.my[r.chat_id]=ms(r.last_read_at);
+     if(r.chat_id===S.cur){S.reads=c.readsAll;renderMsgs(false)}renderList();return}}
+   refreshChats()})
+  .on('postgres_changes',{event:'UPDATE',schema:'public',table:'zap_chats'},refreshChats)
+  .subscribe(st=>{if(st==='SUBSCRIBED')refreshChats()});
+ pres=sb.channel('zap-online',{config:{presence:{key:me}}});
+ pres.on('presence',{event:'sync'},()=>{S.peers=Object.values(pres.presenceState()).flat();renderList();renderHead()})
+  .subscribe(async st=>{if(st==='SUBSCRIBED')await pres.track({uid:me,typing:null,tt:0})});
+}
+
+/* ---------- menu da mensagem ---------- */
+$('#reBar').innerHTML=REACT.map(e=>`<button data-re="${e}" aria-label="Reagir ${e}">${e}</button>`).join('');
+function openMenu(id,rect){
+ const m=S.msgs.find(x=>x.id===id);if(!m||m.del||m.sys||m._p)return;menuId=id;const mn=$('#menu');
+ mn.querySelector('[data-a=del]').style.display=m.by===me?'':'none';
+ mn.classList.add('on');const w=220,h=mn.offsetHeight;
+ let x=m.by===me?rect.right-w:rect.left,y=rect.bottom+6;if(y+h>innerHeight-10)y=Math.max(10,rect.top-h-6);
+ mn.style.left=Math.max(8,Math.min(x,innerWidth-w-8))+'px';mn.style.top=y+'px';
+}
+const closeMenu=()=>{$('#menu').classList.remove('on');menuId=null};
+async function react(id,e){
+ const m=S.msgs.find(x=>x.id===id);if(!m||m._p)return;
+ const r={...(m.react||{})};if(r[me]===e)delete r[me];else r[me]=e;m.react=r;renderMsgs(false);
+ const{error}=await sb.rpc('zap_react',{mid:id,p_emoji:e});if(error)toast(errMsg(error,'Não deu pra reagir.'));
+}
+$('#menu').addEventListener('click',async ev=>{
+ const b=ev.target.closest('button');if(!b||!menuId)return;const id=menuId,m=S.msgs.find(x=>x.id===id);closeMenu();if(!m)return;
+ if(b.dataset.re)return react(id,b.dataset.re);
+ if(b.dataset.a==='reply'){S.reply={id,by:m.by,text:m.text.slice(0,160)};renderReply();$('#tx')?.focus()}
+ if(b.dataset.a==='copy'){try{await navigator.clipboard.writeText(m.text);toast('Copiado!')}catch(e){toast('Não deu pra copiar aqui.')}}
+ if(b.dataset.a==='del'){confirmBox('Apagar pra todos?','A mensagem some pra todo mundo da conversa.','Apagar',async()=>{
+  const{error}=await sb.rpc('zap_delete_msg',{mid:id});if(error)toast(errMsg(error,'Não consegui apagar.'))})}
+});
+document.addEventListener('click',e=>{if(menuId&&!e.target.closest('#menu')&&!e.target.closest('.b'))closeMenu()});
+addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenu();closeDlg()}});
+
+/* ---------- diálogos ---------- */
+const closeDlg=()=>$('#veil').classList.remove('on');
+$('#veil').addEventListener('click',e=>{if(e.target.id==='veil')closeDlg()});
+function dlg(html){$('#dlg').innerHTML=html;$('#veil').classList.add('on')}
+function confirmBox(t,txt,ok,fn){dlg(`<h3>${esc(t)}</h3><div class="bd"><p style="margin:0;color:var(--mute)">${esc(txt)}</p></div><div class="ft"><button class="btn" data-x>Cancelar</button><button class="btn pri" id="okB">${esc(ok)}</button></div>`);
+ $('#okB').onclick=()=>{closeDlg();fn()}}
+$('#dlg').addEventListener('click',e=>{
+ if(e.target.closest('[data-x]'))return closeDlg();
+ const v=e.target.closest('[data-pv]');if(v){closeDlg();return startChat([v.dataset.pv],false)}
+ const b=e.target.closest('[data-copy]');if(b&&b.dataset.copy)copyTxt(b.dataset.copy)});
+async function copyTxt(t){try{await navigator.clipboard.writeText(t);toast('Código copiado!')}catch(e){toast('Não deu pra copiar. O código é '+t)}}
+const codeBox=(code,extra='')=>`<div style="display:flex;gap:8px;align-items:center"><span style="flex:1;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center;font:800 24px/1 ui-monospace,Menlo,monospace;letter-spacing:.22em;color:rgb(var(--accent-soft))">${esc(code||'········')}</span><button class="btn" data-copy="${esc(code||'')}">Copiar</button>${extra}</div>`;
+
+function shrink(file){return new Promise((ok,no)=>{const u=URL.createObjectURL(file),im=new Image();
+ im.onload=()=>{const Z=192,c=document.createElement('canvas');c.width=c.height=Z;const x=c.getContext('2d'),s=Math.min(im.naturalWidth,im.naturalHeight);
+  x.fillStyle='#171b2b';x.fillRect(0,0,Z,Z);x.drawImage(im,(im.naturalWidth-s)/2,(im.naturalHeight-s)/2,s,s,0,0,Z,Z);URL.revokeObjectURL(u);
+  const d=c.toDataURL('image/jpeg',.82);okPhoto(d)?ok(d):no()};im.onerror=()=>{URL.revokeObjectURL(u);no()};im.src=u})}
+function profileDlg(first){
+ const p={...person(me)};let acc=document.documentElement.dataset.accent||'roxo';
+ const keep=()=>{p.nick=$('#pNick').value;p.about=$('#pAbout').value};
+ const draw=()=>dlg(`<h3>${first?'Bem-vindo ao Zap! 👋':'Meu perfil'}<button class="ib" data-x aria-label="Fechar">✕</button></h3><div class="bd">
+  <div style="display:flex;gap:14px;align-items:center"><span class="av" style="--c:${esc(p.color)};width:64px;height:64px;font-size:32px">${face(p.emoji,p.photo)}</span>
+  <div><b>${esc(p.nick||p.username)}</b><br><small style="color:var(--mute)">@${esc(p.username)} · ${esc(p.about||'')}</small></div></div>
+  <div style="display:grid;gap:6px"><small style="color:var(--mute)">Meu código — quem tiver ele te chama no privado</small>${codeBox(p.code)}</div>
+  <label class="f">Apelido (como a galera te vê)<input id="pNick" maxlength="30" value="${esc(p.nick||'')}" placeholder="${esc(p.username)}"></label>
+  <label class="f">Recado<input id="pAbout" maxlength="80" value="${esc(p.about||'')}" placeholder="Disponível"></label>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><label class="btn pri" style="display:inline-flex;align-items:center;cursor:pointer">📷 ${okPhoto(p.photo)?'Trocar foto':'Colocar foto'}<input type="file" id="pFile" accept="image/*" hidden></label>${okPhoto(p.photo)?'<button class="btn red" id="pNoPhoto">Tirar foto</button>':''}</div>
+  <div style="display:grid;gap:5px;font-size:13px;color:var(--mute)">${okPhoto(p.photo)?'Emoji (aparece se tirar a foto)':'Ou use um emoji'}<div class="chips" id="pEmo">${AVS.map(e=>`<button data-v="${e}" class="${e===p.emoji?'on':''}">${e}</button>`).join('')}</div></div>
+  <div style="display:grid;gap:5px;font-size:13px;color:var(--mute)">Cor do anel<div class="chips" id="pCol">${COLORS.map(c=>`<button class="sw${c===p.color?' on':''}" data-v="${c}" style="background:${c}" aria-label="Cor ${c}"></button>`).join('')}</div></div>
+  <div style="display:grid;gap:5px;font-size:13px;color:var(--mute)">Tema (só neste aparelho)<div class="chips" id="pAcc">${ACC.map(a=>`<button class="sw${a===acc?' on':''}" data-v="${a}" style="background:${ACCC[a]}" aria-label="Tema ${a}"></button>`).join('')}</div></div>
+ </div><div class="ft"><button class="btn red" id="logout">Sair da conta</button><button class="btn pri" id="pSave">${first?'Bora conversar':'Salvar'}</button></div>`);
+ const wire=()=>{
+  $('#pEmo').onclick=e=>{const b=e.target.closest('[data-v]');if(b){keep();p.emoji=b.dataset.v;draw();wire()}};
+  $('#pCol').onclick=e=>{const b=e.target.closest('[data-v]');if(b){keep();p.color=b.dataset.v;draw();wire()}};
+  $('#pAcc').onclick=e=>{const b=e.target.closest('[data-v]');if(b){keep();acc=b.dataset.v;document.documentElement.dataset.accent=acc;try{localStorage.setItem('zap-accent',acc)}catch(er){}draw();wire()}};
+  $('#pFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;keep();try{p.photo=await shrink(f);draw();wire()}catch(er){toast('Não consegui abrir essa imagem.')}};
+  $('#pNoPhoto')&&($('#pNoPhoto').onclick=()=>{keep();p.photo='';draw();wire()});
+  $('#logout').onclick=()=>confirmBox('Sair da conta?','Você vai precisar entrar de novo neste aparelho.','Sair',()=>sb.auth.signOut());
+  $('#pSave').onclick=async()=>{keep();closeDlg();
+   const row={nick:p.nick.trim().slice(0,30),about:p.about.trim().slice(0,80),emoji:p.emoji,color:p.color,photo:okPhoto(p.photo)?p.photo:''};
+   const{error}=await sb.from('zap_profiles').update(row).eq('id',me);
+   if(error)return toast(errMsg(error,'Não consegui salvar o perfil.'));
+   Object.assign(S.people[me],row);paintMe();renderList();renderHead();renderMsgs(false);toast('Perfil salvo')};
+ };
+ draw();wire();
+}
+function joinDlg(){
+ dlg(`<h3>Entrar com código<button class="ib" data-x aria-label="Fechar">✕</button></h3><div class="bd">
+  <p style="margin:0;color:var(--mute);font-size:14px">Cole o código de um <b>grupo</b> pra entrar nele, ou o código de uma <b>pessoa</b> pra chamar ela no privado.</p>
+  <input id="jc" maxlength="12" autocomplete="off" placeholder="CÓDIGO" aria-label="Código" style="background:var(--card);border:1px solid var(--line);border-radius:12px;height:56px;text-align:center;font:800 24px ui-monospace,Menlo,monospace;letter-spacing:.25em;text-transform:uppercase;outline:0;color:var(--ink)">
+  <small style="color:var(--mute)">Seu código pra galera te chamar:</small>${codeBox(person(me).code)}
+ </div><div class="ft"><button class="btn" data-x>Cancelar</button><button class="btn pri" id="jOk">Entrar</button></div>`);
+ const i=$('#jc');i.focus();i.onkeydown=e=>{if(e.key==='Enter')$('#jOk').click()};
+ $('#jOk').onclick=async()=>{const code=i.value.toUpperCase().replace(/[^A-Z0-9]/g,'');if(code.length<6)return toast('Código inválido.');
+  $('#jOk').disabled=true;const{data,error}=await sb.rpc('zap_join',{p_code:code});
+  if(error){$('#jOk').disabled=false;return toast(errMsg(error,'Não consegui verificar o código.'))}
+  closeDlg();await loadChats();openChat(data.id);if(data.kind==='chat')toast('Você entrou em '+(chat(data.id)?.name||'um grupo')+'!')};
+}
+function newDlg(group=false,preset=[],addTo=null){
+ const known=new Set(S.chats.flatMap(c=>c.members));known.delete(me);preset.forEach(x=>known.delete(x));
+ const ids=[...known];let gEmo='👥';
+ const ppl=ids.map(id=>{const p=person(id);return`<label class="pick">${group?`<input type="checkbox" data-id="${esc(id)}">`:''}<span class="av sm" style="--c:${esc(p.color)}">${face(p.emoji,p.photo)}</span>
+  <span class="rt"><b>${esc(nameOf(id))}</b><small>${esc(p.about||'')}</small></span>${group?'':`<button class="btn" data-dm="${esc(id)}">Conversar</button>`}</label>`}).join('');
+ dlg(`<h3>${addTo?'Adicionar ao grupo':group?'Novo grupo':'Nova conversa'}<button class="ib" data-x aria-label="Fechar">✕</button></h3><div class="bd">
+  ${group&&!addTo?`<label class="f">Nome do grupo<input id="gName" maxlength="40" placeholder="Os 3 Mosqueteiros"></label>
+  <div style="display:grid;gap:5px;font-size:13px;color:var(--mute)">Ícone<div class="chips" id="gEmo">${GEMO.map(e=>`<button data-v="${e}" class="${e===gEmo?'on':''}">${e}</button>`).join('')}</div></div>
+  <small style="color:var(--mute)">O grupo ganha um código de convite. Quem não está na lista entra com ele.</small>`:''}
+  ${!group?`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="toGroup">👥 Criar grupo</button><button class="btn" id="toJoin">🔑 Entrar com código</button></div>`:''}
+  ${ppl?(group?'':'<small style="color:var(--mute)">Gente dos seus grupos:</small>')+ppl:`<div class="hint" style="margin:0">${group?'Ninguém pra adicionar daqui ainda — crie o grupo e mande o código pra galera.':'Ainda não tem ninguém nos seus grupos. Use 🔑 com o código de um amigo, ou crie um grupo e mande o código.'}</div>`}
+ </div>${group?`<div class="ft"><button class="btn pri" id="gOk">${addTo?'Adicionar':'Criar grupo'}</button></div>`:''}`);
+ $('#toGroup')&&($('#toGroup').onclick=()=>newDlg(true));
+ $('#toJoin')&&($('#toJoin').onclick=joinDlg);
+ $('#gEmo')&&($('#gEmo').onclick=e=>{const b=e.target.closest('[data-v]');if(!b)return;gEmo=b.dataset.v;$('#gEmo').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b))});
+ $('#dlg').querySelectorAll('[data-dm]').forEach(b=>b.onclick=e=>{e.preventDefault();closeDlg();startChat([b.dataset.dm],false)});
+ $('#gOk')&&($('#gOk').onclick=async()=>{const sel=[...$('#dlg').querySelectorAll('input[data-id]:checked')].map(i=>i.dataset.id);
+  if(addTo){if(!sel.length)return toast('Escolha pelo menos uma pessoa.');closeDlg();
+   const{error}=await sb.rpc('zap_add_members',{cid:addTo,p_members:sel});if(error)toast(errMsg(error,'Não consegui adicionar.'));else refreshChats();return}
+  closeDlg();startChat(sel,true,($('#gName')?.value||'').trim()||'Grupo da galera',gEmo)});
+}
+async function startChat(ids,group,name='',emoji=''){
+ const{data,error}=await sb.rpc('zap_create_chat',{p_group:group,p_name:name,p_emoji:emoji,p_members:ids});
+ if(error)return toast(errMsg(error,'Não consegui criar a conversa.'));
+ await loadChats();S.cur=null;openChat(data);
+}
+function infoDlg(){
+ const c=chat(S.cur);if(!c)return;const L=chatLook(c),on=online(),admin=c.admins.includes(me);
+ const mem=[me,...others(c)].map(id=>{const p=person(id);return`<div class="pick"><span class="av sm" style="--c:${esc(p.color)}">${face(p.emoji,p.photo)}${on.has(id)?'<i class="dot"></i>':''}</span>
+  <span class="rt"><b>${esc(nameOf(id))}${c.admins.includes(id)?' · <small style="color:rgb(var(--accent-soft))">admin</small>':''}</b><small>${esc(p.about||'')}</small></span>${id!==me?`<button class="btn" data-pv="${esc(id)}" title="Conversar no privado">💬 Privado</button>`:''}</div>`}).join('');
+ dlg(`<h3>${c.group?'Dados do grupo':'Contato'}<button class="ib" data-x aria-label="Fechar">✕</button></h3><div class="bd">
+  <div style="text-align:center"><span class="av" style="--c:${esc(L.color)};width:84px;height:84px;font-size:42px;margin:auto">${face(L.emoji,L.photo)}</span><h2 style="margin:10px 0 0;font-size:22px">${esc(L.name)}</h2>
+  ${c.group?`<small style="color:var(--mute)">Grupo · ${c.members.length} participantes</small>`:`<small style="color:var(--mute)">${L.uid?'@'+esc(person(L.uid).username||'')+' · '+esc(person(L.uid).about||''):''}</small>`}</div>
+  ${c.group?`<div style="display:grid;gap:6px"><small style="color:var(--mute)">Código de convite — mande pra galera entrar</small>${codeBox(c.code,admin?'<button class="btn" id="newCode">Novo</button>':'')}</div>`:''}
+  ${c.group&&admin?`<label class="f">Renomear grupo<input id="rn" maxlength="40" value="${esc(c.name||'')}"></label>`:''}
+  ${c.group?mem:''}
+ </div><div class="ft">${c.group?`<button class="btn red" id="leave">Sair do grupo</button>${admin?'<button class="btn" id="addP">+ Pessoa</button><button class="btn pri" id="rnOk">Salvar</button>':''}`:'<button class="btn" data-x>Fechar</button>'}</div>`);
+ $('#addP')&&($('#addP').onclick=()=>newDlg(true,c.members,c.id));
+ $('#newCode')&&($('#newCode').onclick=()=>confirmBox('Gerar um novo código?','O código antigo para de funcionar.','Gerar',async()=>{
+  const{data,error}=await sb.rpc('zap_regen_code',{cid:c.id});if(error)return toast(errMsg(error,'Não consegui gerar.'));c.code=data;toast('Novo código: '+data);infoDlg()}));
+ $('#rnOk')&&($('#rnOk').onclick=async()=>{const n=$('#rn').value.trim();closeDlg();if(!n||n===c.name)return;
+  const{error}=await sb.rpc('zap_rename',{cid:c.id,p_name:n});if(error)toast(errMsg(error,'Não consegui renomear.'));else{c.name=n;renderHead();renderList()}});
+ $('#leave')&&($('#leave').onclick=()=>confirmBox('Sair do grupo?','Você para de ver as mensagens desse grupo.','Sair',async()=>{
+  const{error}=await sb.rpc('zap_leave',{cid:c.id});if(error)return toast(errMsg(error,'Não consegui sair.'));
+  closeChat();S.chats=S.chats.filter(x=>x.id!==c.id);renderList();refreshChats()}));
+}
+
+/* ---------- eventos ---------- */
+$('#list').addEventListener('click',e=>{const r=e.target.closest('[data-c]');if(r)openChat(r.dataset.c)});
+$('#q').addEventListener('input',e=>{S.q=e.target.value;renderList()});
+$('#joinBtn').onclick=()=>me?joinDlg():null;
+$('#newBtn').onclick=()=>me?newDlg():null;
+$('#meBtn').onclick=()=>me?profileDlg(false):null;
+$('#main').addEventListener('click',e=>{
+ const t=e.target;
+ if(t.closest('#back')){closeChat();renderList();return}
+ if(t.closest('#info')||t.closest('#who'))return infoDlg();
+ if(t.closest('#emoBtn'))return $('#emo').classList.toggle('on');
+ const em=t.closest('[data-e]');if(em){const tx=$('#tx'),s=tx.selectionStart??tx.value.length;tx.value=tx.value.slice(0,s)+em.dataset.e+tx.value.slice(s);tx.focus();grow();return}
+ if(t.closest('#sendBtn'))return send();
+ if(t.closest('#noRep')){S.reply=null;return renderReply()}
+ const pv=t.closest('[data-pv]');if(pv){e.stopPropagation();closeMenu();return startChat([pv.dataset.pv],false)}
+ const rx=t.closest('[data-rx]');if(rx)return react(rx.dataset.m,rx.dataset.rx);
+ const b=t.closest('.b');if(b&&!t.closest('a')){e.stopPropagation();openMenu(b.dataset.m,b.getBoundingClientRect())}
+});
+$('#main').addEventListener('dblclick',e=>{const b=e.target.closest('.b');if(b){closeMenu();react(b.dataset.m,'❤️')}});
+$('#main').addEventListener('input',e=>{if(e.target.id==='tx'){grow();setTyping(!!e.target.value.trim())}});
+$('#main').addEventListener('keydown',e=>{
+ if(e.target.id==='tx'&&e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&matchMedia('(min-width:761px)').matches){e.preventDefault();send()}
+ if(e.target.classList.contains('b')&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openMenu(e.target.dataset.m,e.target.getBoundingClientRect())}
+});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){markRead();if(me)refreshChats()}});
+setInterval(()=>{if(S.peers.length){renderHead();renderList()}},5000);
+
+/* ---------- início ---------- */
+function paintMe(){const p=person(me);$('#meAv').innerHTML=face(p.emoji,p.photo);$('#meAv').style.setProperty('--c',p.color)}
+async function enter(){
+ if(started)return;started=true;$('#auth').classList.add('off');
+ $('#list').innerHTML='<div class="hint">Carregando conversas…</div>';
+ const{data:p,error}=await sb.rpc('zap_me');
+ if(error||!p){started=false;$('#auth').classList.remove('off');$('#aErr').textContent=errMsg(error,'Não consegui abrir seu perfil. O banco do Zap já foi instalado?');return}
+ S.people[me]=p;paintMe();
+ try{await loadChats()}catch(e){$('#list').innerHTML='<div class="hint">Não consegui carregar as conversas. Confira a internet e recarregue.</div>'}
+ startLive();
+ let seenW=false;try{seenW=!!localStorage.getItem('zap-w-'+me);localStorage.setItem('zap-w-'+me,'1')}catch(e){}
+ if(!seenW&&Date.now()-ms(p.created_at)<600000)profileDlg(true);
+}
+function leave(){started=false;me=null;S.chats=[];S.people={};closeChat();live&&sb.removeChannel(live);pres&&sb.removeChannel(pres);live=pres=null;
+ $('#auth').classList.remove('off');$('#list').innerHTML=''}
+(async()=>{
+ try{const r=await fetch('/api/config');const c=await r.json();if(!c.url||!c.anonKey)throw 0;DOMAIN=c.domain||DOMAIN;
+  sb=supabase.createClient(c.url,c.anonKey,{auth:{persistSession:true,autoRefreshToken:true}});
+ }catch(e){$('#aErr').textContent='O site ainda não foi ligado ao Supabase. (Faltam as variáveis na Vercel.)';return}
+ sb.auth.onAuthStateChange((ev,session)=>{const id=session?.user?.id||null;
+  if(id&&id!==me){me=id;setTimeout(enter,0)}else if(!id&&me)leave()});
+ const{data}=await sb.auth.getSession();if(!data.session)$('#aUser').focus();
+})();
+}
+</script>
+</body>
+</html>
