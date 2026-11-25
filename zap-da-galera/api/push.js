@@ -37,14 +37,14 @@ module.exports = async (req, res) => {
     const payload = JSON.stringify({
       title: chat.is_group ? (chat.emoji || "👥") + " " + (chat.name || "Grupo") : who,
       body: (chat.is_group || m.event ? who + ": " : "") + String(what).slice(0, 140),
-      chat: chat.id, tag: "zap-" + chat.id,
+      chat: chat.id, tag: (m.event && m.event.call ? "zap-call-" : "zap-") + chat.id, call: !!(m.event && m.event.call),
     });
     const k = await vapid();
     webpush.setVapidDetails("https://zap-da-galera.vercel.app", k.publicKey, k.privateKey);
     let sent = 0;
     await Promise.all(subs.map(async (sub) => {
       try {
-        await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, { TTL: 3600, urgency: "high" });
+        await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, { TTL: m.event && m.event.call ? 60 : 3600, urgency: "high" });
         sent++;
       } catch (e) {
         if (e && (e.statusCode === 404 || e.statusCode === 410)) {
