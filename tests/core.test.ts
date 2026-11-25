@@ -195,3 +195,12 @@ describe("adaptadores dos provedores (formato real das APIs)", () => {
     expect(estimateCost(1_000_000, 500_000, 1, 4)).toBe(3);
   });
 });
+
+describe("ENCRYPTION_KEY como frase", () => {
+  it("aceita frase longa e recusa curta", () => {
+    process.env.ENCRYPTION_KEY = "minha frase secreta muito longa do ai friends 2026";
+    expect(decryptSecret(encryptSecret("abc"))).toBe("abc");
+    process.env.ENCRYPTION_KEY = "curta";
+    expect(() => encryptSecret("abc")).toThrow(/32 caracteres/);
+  });
+});

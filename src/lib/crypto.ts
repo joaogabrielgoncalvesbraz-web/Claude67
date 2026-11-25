@@ -1,11 +1,16 @@
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
+/**
+ * ENCRYPTION_KEY pode ser 32 bytes em base64 OU qualquer frase secreta com 32+ caracteres
+ * (nesse caso a chave AES é derivada com SHA-256).
+ */
 function masterKey(): Buffer {
-  const raw = process.env.ENCRYPTION_KEY;
+  const raw = process.env.ENCRYPTION_KEY?.trim();
   if (!raw) throw new Error("ENCRYPTION_KEY não configurada no servidor.");
-  const key = Buffer.from(raw, "base64");
-  if (key.length !== 32) throw new Error("ENCRYPTION_KEY precisa ter 32 bytes em base64.");
-  return key;
+  const b64 = /^[A-Za-z0-9+/]{43}=$/.test(raw) ? Buffer.from(raw, "base64") : null;
+  if (b64 && b64.length === 32) return b64;
+  if (raw.length < 32) throw new Error("ENCRYPTION_KEY precisa ter pelo menos 32 caracteres.");
+  return createHash("sha256").update(raw, "utf8").digest();
 }
 
 export interface EncryptedSecret {
