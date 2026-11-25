@@ -204,3 +204,11 @@ describe("ENCRYPTION_KEY como frase", () => {
     expect(() => encryptSecret("abc")).toThrow(/32 caracteres/);
   });
 });
+
+describe("ENCRYPTION_KEY ausente", () => {
+  it("usa SUPABASE_JWT_SECRET como base", () => {
+    delete process.env.ENCRYPTION_KEY;
+    process.env.SUPABASE_JWT_SECRET = "jwt-secret-de-exemplo-com-bastante-tamanho";
+    expect(decryptSecret(encryptSecret("xyz"))).toBe("xyz");
+  });
+});
