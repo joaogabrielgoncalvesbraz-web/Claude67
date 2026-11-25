@@ -23,8 +23,8 @@ Pode usar **o mesmo projeto do AI FRIENDS** (as tabelas daqui começam com `zap_
 | Nome | Valor |
 |---|---|
 | `SUPABASE_URL` | o Project URL |
-| `SUPABASE_ANON_KEY` | a chave anon public |
-| `SUPABASE_SERVICE_ROLE_KEY` | a chave service_role (**secreta**) |
+| `SUPABASE_ANON_KEY` | a chave anon public (ou `SUPABASE_PUBLISHABLE_KEY`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | a chave service_role (**secreta**; ou `SUPABASE_SECRET_KEY`) |
 | `AUTH_EMAIL_DOMAIN` | *(opcional)* o mesmo valor do AI FRIENDS, se você mudou lá |
 
 4. Clique em **Deploy**. Pronto: o link que a Vercel mostrar é o seu Zap.

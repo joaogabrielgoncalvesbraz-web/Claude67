@@ -1,0 +1,7 @@
+{
+  "name": "zap-da-galera",
+  "private": true,
+  "description": "Chat só da turma (Supabase + Vercel)",
+  "engines": { "node": ">=18" },
+  "dependencies": { "web-push": "3.6.7" }
+}
