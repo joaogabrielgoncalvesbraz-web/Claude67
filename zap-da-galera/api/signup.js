@@ -21,7 +21,7 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: "A senha precisa ter pelo menos 8 caracteres." });
 
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
   const domain = process.env.AUTH_EMAIL_DOMAIN || "users.aifriends.local";
   if (!url || !key) return res.status(500).json({ error: "O site ainda não foi ligado ao Supabase (faltam variáveis na Vercel)." });
 
@@ -29,7 +29,8 @@ module.exports = async (req, res) => {
   try {
     const r = await fetch(url.replace(/\/$/, "") + "/auth/v1/admin/users", {
       method: "POST",
-      headers: { apikey: key, Authorization: "Bearer " + key, "Content-Type": "application/json" },
+      // Chaves novas (sb_secret_...) vão só no apikey; as antigas (JWT) também no Authorization.
+      headers: Object.assign({ apikey: key, "Content-Type": "application/json" }, key.startsWith("eyJ") ? { Authorization: "Bearer " + key } : {}),
       body: JSON.stringify({ email: `${username}@${domain}`, password, email_confirm: true, user_metadata: { username } }),
     });
     const j = await r.json().catch(() => ({}));
