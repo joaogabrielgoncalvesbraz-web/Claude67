@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --accent: 124 92 255; --accent-soft: 162 139 255; color-scheme: dark; }
+[data-theme="azul"] { --accent: 59 130 246; --accent-soft: 147 197 253; }
+[data-theme="verde"] { --accent: 34 197 94; --accent-soft: 134 239 172; }
+[data-theme="laranja"] { --accent: 249 115 22; --accent-soft: 253 186 116; }
+[data-theme="rosa"] { --accent: 236 72 153; --accent-soft: 249 168 212; }
+
+html, body { height: 100%; }
+body {
+  @apply bg-bg text-slate-100 antialiased;
+  background-image:
+    radial-gradient(900px 500px at 10% -10%, rgb(var(--accent) / 0.12), transparent 60%),
+    radial-gradient(700px 400px at 110% 10%, rgba(34, 197, 94, 0.06), transparent 60%);
+  background-attachment: fixed;
+  -webkit-tap-highlight-color: transparent;
+}
+.scroll-thin::-webkit-scrollbar { width: 6px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: #2a3050; border-radius: 6px; }
+input[type="range"] { accent-color: rgb(var(--accent)); }
+.safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 0.5rem); }
+.chat-bg {
+  background-image: radial-gradient(rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
