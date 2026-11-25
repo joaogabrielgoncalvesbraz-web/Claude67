@@ -6,10 +6,11 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
  */
 function masterKey(): Buffer {
   const own = process.env.ENCRYPTION_KEY?.trim();
-  // Sem ENCRYPTION_KEY: deriva do segredo JWT do Supabase (que a integração Vercel↔Supabase já configura).
-  const jwt = process.env.SUPABASE_JWT_SECRET?.trim();
-  const raw = own || (jwt ? "ai-friends-keys:" + jwt : "");
-  if (!raw) throw new Error("ENCRYPTION_KEY (ou SUPABASE_JWT_SECRET) não configurada no servidor.");
+  // Sem ENCRYPTION_KEY: deriva de um segredo do Supabase que a integração Vercel↔Supabase já configura.
+  // Atenção: se esse segredo for trocado, as chaves de API salvas precisam ser cadastradas de novo.
+  const derived = (process.env.SUPABASE_JWT_SECRET || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+  const raw = own || (derived ? "ai-friends-keys:" + derived : "");
+  if (!raw) throw new Error("ENCRYPTION_KEY não configurada no servidor.");
   const b64 = /^[A-Za-z0-9+/]{43}=$/.test(raw) ? Buffer.from(raw, "base64") : null;
   if (b64 && b64.length === 32) return b64;
   if (raw.length < 32) throw new Error("ENCRYPTION_KEY precisa ter pelo menos 32 caracteres.");
