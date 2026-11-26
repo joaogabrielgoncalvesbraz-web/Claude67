@@ -45,7 +45,19 @@ function typers(cid){const s=new Set();for(const p of S.peers[cid]||[])if(p.uid&
 function fmt(t){let h=esc(t);
  h=h.replace(/https?:\/\/[^\s<]+/g,u=>/^https:/.test(u)?`<a href="${u}" target="_blank" rel="noopener">${u}</a>`:u);
  return h.replace(/(^|\s)@([\wÀ-ÿ]+)/g,(m,a,b)=>`${a}<span class="mn">@${b}</span>`)}
-const preview=m=>m.del?'🚫 Mensagem apagada':(m.text||(m.media?.type==='image'?'📷 Foto':m.media?.type==='audio'?'🎤 Áudio':''));
+/* GIF por link: Giphy, Tenor ou Klipy viram animação na conversa */
+function gifUrl(t){
+ const u=String(t||'').trim();if(!/^https:\/\/\S+$/.test(u)||u.length>400)return null;
+ let x;try{x=new URL(u)}catch(e){return null}
+ const h=x.hostname;
+ const g=h==='giphy.com'&&x.pathname.match(/^\/(?:gifs|stickers)\/(?:[\w-]*-)?([A-Za-z0-9]{6,})\/?$/);
+ if(g)return'https://i.giphy.com/media/'+g[1]+'/giphy.gif';
+ if(/(^|\.)giphy\.com$/.test(h)&&/\.(gif|webp)$/i.test(x.pathname))return x.origin+x.pathname;
+ if(/(^|\.)tenor\.com$/.test(h)&&h!=='tenor.com'&&/\.(gif|webp)$/i.test(x.pathname))return x.origin+x.pathname;
+ if(/(^|\.)klipy\.com$/.test(h)&&/\.(gif|webp)$/i.test(x.pathname))return x.origin+x.pathname;
+ return null;
+}
+const preview=m=>m.del?'🚫 Mensagem apagada':((gifUrl(m.text)?'🎞️ GIF':m.text)||(m.media?.type==='image'?(/\.gif$/i.test(m.media.path)?'🎞️ GIF':'📷 Foto'):m.media?.type==='audio'?'🎤 Áudio':''));
 
 /* ---------- login ---------- */
 /* contas salvas neste aparelho: o usuário fica guardado e o navegador oferece salvar a senha */
@@ -126,10 +138,14 @@ async function upload(cid,blob,ext,type){
  if(error)throw new Error(/size|large/i.test(error.message)?'Arquivo grande demais (máx. 10 MB).':'Não consegui enviar o arquivo.');
  return path;
 }
+function gifSize(file){return new Promise(ok=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{ok({w:im.naturalWidth,h:im.naturalHeight});URL.revokeObjectURL(u)};im.onerror=()=>{ok({w:4,h:3});URL.revokeObjectURL(u)};im.src=u})}
 async function sendPhoto(file){
  const c=chat(S.cur);if(!c||!file)return;if(!/^image\//.test(file.type))return toast('Escolha uma imagem.');
- toast('Enviando foto…');
- try{const{blob,w,h}=await resize(file);const path=await upload(c.id,blob,'jpg','image/jpeg');
+ const gif=file.type==='image/gif';
+ if(gif&&file.size>10*1024*1024)return toast('GIF grande demais (máx. 10 MB).');
+ toast(gif?'Enviando GIF…':'Enviando foto…');
+ try{const{blob,w,h}=gif?{blob:file,...await gifSize(file)}:await resize(file);
+  const path=await upload(c.id,blob,gif?'gif':'jpg',gif?'image/gif':'image/jpeg');
   const cap=$('#tx').value.trim();$('#tx').value='';grow();
   await sendRaw(cap,{type:'image',path,w,h});
  }catch(e){toast(e.message||'Não consegui enviar a foto.')}
@@ -240,12 +256,13 @@ function renderMsgs(stick){
   if(c.group&&!mine&&first)body+=`<div class="nm" data-pv="${esc(m.by)}" title="Conversar no privado" style="--c:${esc(p.color)};cursor:pointer">${esc(nameOf(m.by))}</div>`;
   if(m.reply&&!m.del){const rp=person(m.reply.by);body+=`<div class="q" data-jump="${esc(m.reply.id)}" style="--c:${esc(rp.color)}"><b>${esc(nameOf(m.reply.by))}</b><span>${esc(m.reply.text)}</span></div>`}
   body+=mediaHTML(m);
-  if(m.del)body+='<div class="tx del">🚫 Mensagem apagada</div>';else if(m.text)body+=`<div class="tx">${fmt(m.text)}</div>`;
+  const gu=!m.del&&!m.media&&gifUrl(m.text);
+  if(m.del)body+='<div class="tx del">🚫 Mensagem apagada</div>';else if(gu)body+=`<img class="pic gif" src="${esc(gu)}" alt="GIF" loading="lazy" referrerpolicy="no-referrer">`;else if(m.text)body+=`<div class="tx">${fmt(m.text)}</div>`;
   body+=`<div class="meta">${m.edited&&!m.del?'<i>editada</i>':''}${c.pinned===m.id?'📌':''}${esc(hm(m.at))}${mine&&!m.del?tick(m,c):''}</div>`;
   const rx={};for(const[u,e]of Object.entries(m.react||{}))if(e)(rx[e]=rx[e]||[]).push(u);
   const rxh=Object.entries(rx).map(([e,us])=>`<button data-rx="${esc(e)}" data-m="${esc(m.id)}" class="${us.includes(me)?'mine':''}" title="${esc(us.map(nameOf).join(', '))}">${esc(e)} ${us.length>1?us.length:''}</button>`).join('');
   const nw=S.seen.size&&!S.seen.has(m.id);
-  h+=`<div class="m${nw?' nw':''}${mine?' me':''}${first?' first':''}${first&&prev?' gap':''}${m.media?.type==='image'&&!m.del?' hasPic':''}" id="m-${esc(m.id)}"><span class="av sm" ${c.group&&!mine?`data-pv="${esc(m.by)}" title="Conversar no privado" style="--c:${esc(p.color)};cursor:pointer"`:`style="--c:${esc(p.color)}"`}>${face(p.emoji,p.photo)}</span>
+  h+=`<div class="m${nw?' nw':''}${mine?' me':''}${first?' first':''}${first&&prev?' gap':''}${(m.media?.type==='image'||gu)&&!m.del?' hasPic':''}" id="m-${esc(m.id)}"><span class="av sm" ${c.group&&!mine?`data-pv="${esc(m.by)}" title="Conversar no privado" style="--c:${esc(p.color)};cursor:pointer"`:`style="--c:${esc(p.color)}"`}>${face(p.emoji,p.photo)}</span>
    <div><div class="b" data-m="${esc(m.id)}" tabindex="0">${body}</div>${rxh?`<div class="rx">${rxh}</div>`:''}</div></div>`;
   prev=m;
  }
@@ -264,7 +281,7 @@ function renderComposer(){
  if(S.edit){top=`<div class="rep"><div class="q" style="--c:rgb(var(--accent))"><b>✏️ Editando mensagem</b><span>${esc(S.edit.text)}</span></div><button class="ib" id="noRep" aria-label="Cancelar edição">✕</button></div>`}
  else if(S.reply){const p=person(S.reply.by);top=`<div class="rep"><div class="q" style="--c:${esc(p.color)}"><b>${esc(nameOf(S.reply.by))}</b><span>${esc(S.reply.text)}</span></div><button class="ib" id="noRep" aria-label="Cancelar resposta">✕</button></div>`}
  box.innerHTML=`${top}<div class="emo" id="emo">${KB.map(e=>`<button data-e="${e}">${e}</button>`).join('')}</div>
-  <div class="cb"><button class="ib" id="emoBtn" aria-label="Emojis">😊</button><label class="ib" id="clip" aria-label="Mandar foto" title="Mandar foto">📎<input type="file" id="pick" accept="image/*" hidden></label>
+  <div class="cb"><button class="ib" id="emoBtn" aria-label="Emojis">😊</button><label class="ib" id="clip" aria-label="Mandar foto" title="Mandar foto">📎<input type="file" id="pick" accept="image/*" hidden></label><button class="ib gifb" id="gifBtn" aria-label="Mandar GIF" title="Mandar GIF">GIF</button>
   <textarea id="tx" rows="1" placeholder="Mensagem" aria-label="Mensagem"></textarea>
   <button class="send" id="sendBtn" aria-label="Enviar">🎤</button></div>`;
  const tx=$('#tx');tx.value=S.edit&&!keep?S.edit.text:keep;grow();
@@ -519,6 +536,19 @@ function fxDlg(){
    if(error)return toast(errMsg(error,'Não consegui soltar o evento.'))}};
  draw();
 }
+function gifDlg(){
+ if(!chat(S.cur))return;
+ dlg(`<h3>🎞️ Mandar GIF<button class="ib" data-x aria-label="Fechar">✕</button></h3><div class="bd">
+  <label class="btn pri" style="display:inline-flex;align-items:center;justify-content:center;cursor:pointer">📁 Escolher GIF do aparelho<input type="file" id="gifPick" accept="image/gif" hidden></label>
+  <label class="f">Ou cole o link de um GIF<input id="gifLink" class="inp" placeholder="https://giphy.com/gifs/..." autocomplete="off"></label>
+  <div id="gifPrev"></div>
+  <small style="color:var(--mute)">Dica: ache o GIF no <b>giphy.com</b> ou no <b>tenor.com</b>, toque em compartilhar → copiar link (no Tenor, abra o GIF e copie o endereço da imagem) e cole aqui. No celular, o GIF do teclado (Gboard) também pode ser colado direto na caixa de mensagem.</small>
+ </div><div class="ft"><button class="btn" data-x>Cancelar</button><button class="btn pri" id="gifOk" disabled>Mandar</button></div>`);
+ const i=$('#gifLink');let url=null;
+ i.oninput=()=>{url=gifUrl(i.value);$('#gifOk').disabled=!url;$('#gifPrev').innerHTML=url?`<img src="${esc(url)}" alt="Prévia do GIF" referrerpolicy="no-referrer" style="max-width:100%;max-height:220px;border-radius:12px">`:(i.value.trim()?'<small style="color:#fca5a5">Esse link não é de um GIF do Giphy, Tenor ou Klipy.</small>':'')};
+ $('#gifOk').onclick=()=>{if(!url)return;closeDlg();S.edit=null;sendRaw(url,null)};
+ $('#gifPick').onchange=e=>{const f=e.target.files[0];closeDlg();if(f)sendPhoto(f)};
+}
 function findDlg(){
  const c=chat(S.cur);if(!c)return;
  dlg(`<h3>🔍 Pesquisar na conversa<button class="ib" data-x aria-label="Fechar">✕</button></h3><div class="bd">
@@ -747,6 +777,7 @@ $('#main').addEventListener('click',e=>{
  if(t.closest('#older'))return loadOlder();
  if(t.closest('#pinGo'))return S.pinnedMsg&&jumpTo(S.pinnedMsg.id,new Date(S.pinnedMsg.at).toISOString());
  const rp=t.closest('[data-fx]');if(rp){const m=S.msgs.find(x=>x.id===rp.dataset.fx);if(m?.event)playEvent(m);return}
+ if(t.closest('#gifBtn'))return gifDlg();
  if(t.closest('#emoBtn'))return $('#emo').classList.toggle('on');
  const em=t.closest('[data-e]');if(em){const tx=$('#tx'),s=tx.selectionStart??tx.value.length;tx.value=tx.value.slice(0,s)+em.dataset.e+tx.value.slice(s);tx.focus();grow();return}
  if(t.closest('#sendBtn'))return send();
