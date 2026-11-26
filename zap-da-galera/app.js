@@ -48,10 +48,30 @@ function fmt(t){let h=esc(t);
 const preview=m=>m.del?'🚫 Mensagem apagada':(m.text||(m.media?.type==='image'?'📷 Foto':m.media?.type==='audio'?'🎤 Áudio':''));
 
 /* ---------- login ---------- */
+/* contas salvas neste aparelho: o usuário fica guardado e o navegador oferece salvar a senha */
+const saved=()=>{try{return JSON.parse(localStorage.getItem('zap-contas')||'[]').filter(u=>/^[a-z0-9_]{2,20}$/.test(u))}catch(e){return[]}};
+function remember(u,p){
+ try{localStorage.setItem('zap-contas',JSON.stringify([u,...saved().filter(x=>x!==u)].slice(0,5)))}catch(e){}
+ try{if(window.PasswordCredential&&navigator.credentials)navigator.credentials.store(new PasswordCredential({id:u,password:p,name:u})).catch(()=>{})}catch(e){}
+}
+function paintSaved(){
+ let box=$('#aSaved');const l=saved();
+ if(!box){box=document.createElement('div');box.id='aSaved';box.className='saved';$('#authForm').querySelector('.tabs').after(box)}
+ box.innerHTML=l.length&&mode==='in'?`<small>Contas salvas neste aparelho — toque pra entrar:</small><div class="chips">${l.map(u=>`<button type="button" data-u="${esc(u)}">@${esc(u)}</button>`).join('')}</div>`:'';
+}
+async function autoFill(){
+ if(saved().length&&mode!=='in')document.querySelector('#authForm [data-mode=in]').click();
+ paintSaved();const l=saved();if(l[0]&&!$('#aUser').value)$('#aUser').value=l[0];
+ try{if(!window.PasswordCredential||!navigator.credentials)return;
+  const c=await navigator.credentials.get({password:true,mediation:'optional'});
+  if(c&&c.password&&!me){$('#aUser').value=c.id;$('#aPass').value=c.password;$('#authForm').requestSubmit()}
+ }catch(e){}
+}
 let mode='in';
 $('#authForm').querySelector('.tabs').onclick=e=>{const b=e.target.closest('[data-mode]');if(!b)return;mode=b.dataset.mode;
  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
- $('#aGo').textContent=mode==='in'?'Entrar':'Criar conta';$('#aPass').autocomplete=mode==='in'?'current-password':'new-password';$('#aErr').textContent=''};
+ $('#aGo').textContent=mode==='in'?'Entrar':'Criar conta';$('#aPass').autocomplete=mode==='in'?'current-password':'new-password';$('#aErr').textContent='';paintSaved()};
+$('#authForm').addEventListener('click',e=>{const b=e.target.closest('[data-u]');if(!b)return;$('#aUser').value=b.dataset.u;$('#aPass').focus()});
 $('#authForm').onsubmit=async e=>{e.preventDefault();if(!sb)return $('#aErr').textContent='O site ainda está conectando…';
  const u=$('#aUser').value.trim().toLowerCase(),p=$('#aPass').value;$('#aErr').textContent='';
  if(!/^[a-z0-9_]{2,20}$/.test(u))return $('#aErr').textContent='Usuário: 2 a 20 letras minúsculas, números ou _';
@@ -62,6 +82,7 @@ $('#authForm').onsubmit=async e=>{e.preventDefault();if(!sb)return $('#aErr').te
    const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Não deu pra criar a conta.')}
   const{error}=await sb.auth.signInWithPassword({email:u+'@'+DOMAIN,password:p});
   if(error)throw new Error(mode==='in'?'Usuário ou senha incorretos.':'Conta criada, mas não consegui entrar. Tente em Entrar.');
+  remember(u,p);
  }catch(er){$('#aErr').textContent=er.message}
  go.disabled=false;go.textContent=mode==='in'?'Entrar':'Criar conta'};
 
@@ -380,6 +401,7 @@ function profileDlg(first){
  const draw=()=>{const ps=pushState();dlg(`<h3>${first?'Bem-vindo ao Zap! 👋':'Meu perfil'}<button class="ib" data-x aria-label="Fechar">✕</button></h3><div class="bd">
   <div style="display:flex;gap:14px;align-items:center"><span class="av" style="--c:${esc(p.color)};width:64px;height:64px;font-size:32px">${face(p.emoji,p.photo)}</span>
   <div><b>${esc(p.nick||p.username)}</b><br><small style="color:var(--mute)">@${esc(p.username)} · ${esc(p.about||'')}</small></div></div>
+  <div class="sect"><b>👤 Seu usuário pra entrar: @${esc(p.username)}</b><small>Anote ele e sua senha. Se o site te deslogar, é com eles que você entra de novo.</small></div>
   <div style="display:grid;gap:6px"><small style="color:var(--mute)">Meu código — quem tiver ele te chama no privado</small>${codeBox(p.code)}</div>
   <label class="f">Apelido (como a galera te vê)<input id="pNick" maxlength="30" value="${esc(p.nick||'')}" placeholder="${esc(p.username)}"></label>
   <label class="f">Recado<input id="pAbout" maxlength="80" value="${esc(p.about||'')}" placeholder="Disponível"></label>
@@ -761,13 +783,13 @@ async function enter(){
 }
 function leave(){leaveCall(true);started=false;me=null;S.chats=[];S.people={};S.blocks=new Set();closeChat();live&&sb.removeChannel(live);live=null;
  for(const id of Object.keys(rooms)){sb.removeChannel(rooms[id]);delete rooms[id]}S.peers={};
- $('#auth').classList.remove('off');$('#list').innerHTML=''}
+ $('#auth').classList.remove('off');$('#list').innerHTML='';$('#aPass').value='';autoFill()}
 (async()=>{
  try{const r=await fetch('/api/config');const c=await r.json();if(!c.url||!c.anonKey)throw 0;DOMAIN=c.domain||DOMAIN;
   sb=supabase.createClient(c.url,c.anonKey,{auth:{persistSession:true,autoRefreshToken:true}});
  }catch(e){$('#aErr').textContent='O site ainda não foi ligado ao Supabase. (Faltam as variáveis na Vercel.)';return}
  sb.auth.onAuthStateChange((ev,session)=>{const id=session?.user?.id||null;
   if(id&&id!==me){me=id;setTimeout(enter,0)}else if(!id&&me)leave()});
- const{data}=await sb.auth.getSession();if(!data.session)$('#aUser').focus();
+ const{data}=await sb.auth.getSession();if(!data.session){$('#aUser').focus();autoFill()}
 })();
 }
