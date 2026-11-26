@@ -546,7 +546,7 @@ async function jumpTo(id,at){
   if(data){S.msgs=data.map(toMsg);S.more=true;data.forEach(r=>S.seen.add(r.id));renderMsgs(false)}
  }
  const el=document.getElementById('m-'+id);if(!el)return toast('Mensagem não encontrada.');
- el.scrollIntoView({block:'center',behavior:'smooth'});el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),1600);
+ const box=$('#msgs');box&&box.scrollTo({top:el.offsetTop-box.offsetTop-box.clientHeight/2+el.offsetHeight/2,behavior:'smooth'});el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),1600);
 }
 
 /* ---------- notificações ---------- */
@@ -766,6 +766,8 @@ $('#main').addEventListener('keydown',e=>{
 $('#main').addEventListener('paste',e=>{if(e.target.id!=='tx')return;const f=[...(e.clipboardData?.files||[])].find(f=>/^image\//.test(f.type));if(f){e.preventDefault();sendPhoto(f)}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){markRead();if(me)refreshChats()}});
 setInterval(()=>{if(Object.keys(S.peers).length){renderHead();renderList()}},5000);
+const unscroll=()=>{if((scrollY||scrollX)&&matchMedia('(min-width:761px)').matches)scrollTo(0,0);for(const el of [document.documentElement,document.body,$('.app'),$('main'),$('aside')])if(el&&el.scrollTop)el.scrollTop=0};
+addEventListener('scroll',unscroll,{passive:true});document.addEventListener('scroll',unscroll,{capture:true,passive:true});
 
 /* ---------- início ---------- */
 function paintMe(){const p=person(me);$('#meAv').innerHTML=face(p.emoji,p.photo);$('#meAv').style.setProperty('--c',p.color)}
