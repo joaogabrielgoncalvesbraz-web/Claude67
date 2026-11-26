@@ -173,8 +173,6 @@ async function openChat(id){
  S.cur=id;S.msgs=[];S.reads=c.readsAll||{};S.reply=S.edit=null;S.seen=new Set();S.more=false;S.pinnedMsg=null;
  $('#main').innerHTML=`<div class="top"><button class="ib back" id="back" aria-label="Voltar">←</button><span class="av sm" id="hAv"></span>
   <button class="who" id="who"><b id="hName"></b><small id="hSub"></small></button>
-  <button class="ib" id="callA" aria-label="Chamada de voz" title="Chamada de voz">📞</button>
-  <button class="ib" id="callV" aria-label="Chamada de vídeo" title="Chamada de vídeo">📹</button>
   <button class="ib" id="fxBtn" aria-label="Soltar evento" title="Soltar evento" hidden>✨</button>
   <button class="ib" id="findBtn" aria-label="Pesquisar na conversa" title="Pesquisar na conversa">🔍</button>
   <button class="ib" id="info" aria-label="Detalhes">⋮</button></div>
@@ -208,7 +206,6 @@ function renderHead(){renderCall&&inCall()&&renderCall();
  const av=$('#hAv');av.innerHTML=face(L.emoji,L.photo);av.style.setProperty('--c',L.color);
  $('#hName').textContent=L.name+(c.muted?' 🔕':'');const sub=$('#hSub');sub.className='';
  $('#fxBtn').hidden=!canAdmin(c);
- const blk=!c.group&&others(c).some(o=>S.blocks.has(o))||!others(c).length;$('#callA').hidden=$('#callV').hidden=blk;
  if(L.uid&&S.blocks.has(L.uid)){sub.textContent='🚫 Você bloqueou essa pessoa'}
  else if(ty.length){sub.className='ty';sub.textContent=c.group?ty.map(nameOf).join(', ')+' digitando…':'digitando…'}
  else if(c.group)sub.textContent=[me,...others(c)].map(nameOf).join(', ');
@@ -237,7 +234,7 @@ function renderMsgs(stick){
  if(!S.msgs.length)h+=`<div class="sys">Mande a primeira mensagem 👋</div>`;
  for(const m of S.msgs){
   if(dayKey(m.at)!==lastDay){lastDay=dayKey(m.at);h+=`<div class="day">${esc(dayLabel(m.at))}</div>`;prev=null}
-  if(m.sys){h+=`<div class="sys${m.event?' ev':''}" id="m-${esc(m.id)}">${esc(nameOf(m.by))} ${esc(m.text)}${m.event?(m.event.call?(Date.now()-m.at<3*3600e3&&m.by!==me?` <button class="replay" data-join="${esc(m.id)}">Entrar</button>`:''):` <button class="replay" data-fx="${esc(m.id)}">▶️ Ver</button>`):''}</div>`;prev=null;continue}
+  if(m.sys){h+=`<div class="sys${m.event?' ev':''}" id="m-${esc(m.id)}">${esc(nameOf(m.by))} ${esc(m.text)}${m.event?(m.event.call?'':` <button class="replay" data-fx="${esc(m.id)}">▶️ Ver</button>`):''}</div>`;prev=null;continue}
   const mine=m.by===me,p=person(m.by),first=!prev||prev.by!==m.by||m.at-prev.at>3e5;
   let body='';
   if(c.group&&!mine&&first)body+=`<div class="nm" data-pv="${esc(m.by)}" title="Conversar no privado" style="--c:${esc(p.color)};cursor:pointer">${esc(nameOf(m.by))}</div>`;
@@ -321,7 +318,6 @@ function startLive(){
  live=sb.channel('zap-db')
   .on('postgres_changes',{event:'*',schema:'public',table:'zap_messages'},async pl=>{
    const r=pl.new&&pl.new.id?pl.new:null;if(!r)return;
-   if(pl.eventType==='INSERT'&&r.event?.call&&r.user_id!==me&&Date.now()-ms(r.created_at)<40000)showRing(r);
    if(r.chat_id===S.cur){const m=toMsg(r),i=S.msgs.findIndex(x=>x.id===m.id);const near=isNear();
     if(i>=0)S.msgs[i]=m;else{S.msgs.push(m);S.msgs.sort((a,b)=>a.at-b.at)}
     if(await loadPeople([m.by]))renderList();renderMsgs(near||m.by===me);markRead();
