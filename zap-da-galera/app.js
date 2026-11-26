@@ -570,7 +570,13 @@ if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catc
 
 /* ---------- chamadas de voz e vídeo (direto entre os aparelhos, WebRTC) ---------- */
 const ICE=[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302','stun:stun.cloudflare.com:3478']}];
-const CALL={cid:null};let ringing=null;
+const CALL={cid:null};let ringing=null,iceCache=null;
+async function getIce(){
+ if(iceCache&&iceCache.exp>Date.now())return iceCache.list;
+ try{const{data}=await sb.auth.getSession();const r=await fetch('/api/turn',{headers:{Authorization:'Bearer '+(data.session?.access_token||'')}});
+  const j=await r.json();if(Array.isArray(j.iceServers)&&j.iceServers.length){iceCache={list:j.iceServers,exp:Date.now()+(j.turn?3*3600e3:600e3)};return j.iceServers}}catch(e){}
+ return ICE;
+}
 const inCall=()=>!!CALL.cid;
 function callUI(){
  if($('#call'))return;
@@ -608,7 +614,8 @@ async function joinCall(cid,video,caller){
   video:video?{facingMode:'user',width:{ideal:640},height:{ideal:480},frameRate:{ideal:24}}:false})}
  catch(e){toast(video?'Libere a câmera e o microfone pra chamada.':'Libere o microfone pra chamada.');return false}
  callUI();
- Object.assign(CALL,{cid,video,local:stream,peers:{},early:{},people:{},t0:Date.now(),mic:true,cam:video,facing:'user',caller,connectedOnce:false});
+ const ice=await getIce();
+ Object.assign(CALL,{ice,cid,video,local:stream,peers:{},early:{},people:{},t0:Date.now(),mic:true,cam:video,facing:'user',caller,connectedOnce:false});
  const ch=sb.channel('zap-call-'+cid,{config:{presence:{key:me},broadcast:{self:false}}});CALL.ch=ch;
  ch.on('broadcast',{event:'sig'},({payload})=>onSig(payload).catch(()=>{}))
   .on('presence',{event:'sync'},syncCall)
@@ -634,10 +641,11 @@ function syncCall(){
 }
 function makePeer(id,initiator){
  dropPeer(id);
- const pc=new RTCPeerConnection({iceServers:ICE}),P={id,pc,stream:new MediaStream(),pend:CALL.early[id]||[]};delete CALL.early[id];CALL.peers[id]=P;
+ const pc=new RTCPeerConnection({iceServers:CALL.ice||ICE,iceCandidatePoolSize:2}),P={id,pc,stream:new MediaStream(),pend:CALL.early[id]||[]};delete CALL.early[id];CALL.peers[id]=P;
  CALL.local.getTracks().forEach(t=>pc.addTrack(t,CALL.local));
  pc.ontrack=e=>{if(e.streams[0])P.stream=e.streams[0];else P.stream.addTrack(e.track);P.fresh=true;renderCall()};
  pc.onicecandidate=e=>{if(e.candidate)sig(id,{c:e.candidate.toJSON()})};
+ P.t0=Date.now();
  pc.onconnectionstatechange=()=>{if(pc.connectionState==='failed'&&initiator&&pc.restartIce){pc.restartIce();offer(P,true)}renderCall()};
  if(initiator)offer(P);
  return P;
@@ -662,7 +670,7 @@ async function flipCam(){
   $('#cSelf').classList.toggle('back',facing==='environment');
  }catch(e){toast('Não consegui virar a câmera.')}
 }
-function renderCallInfo(){
+function renderCallInfo(){if(inCall()&&Object.values(CALL.peers||{}).some(P=>P.pc.connectionState!=='connected'&&Date.now()-P.t0>15000&&!P.warned&&(P.warned=1)))renderCall();
  if(!inCall()||!$('#cInfo'))return;const n=Object.keys(CALL.people).length;
  const live=Object.values(CALL.peers).some(P=>P.pc.connectionState==='connected');
  if(live&&!CALL.liveAt)CALL.liveAt=Date.now();
@@ -686,8 +694,8 @@ function renderCall(){
   const camOn=CALL.video&&pr.cam!==false&&P&&P.stream.getVideoTracks().length;
   t.classList.toggle('cam',!!camOn);
   const av=t.querySelector('.av');av.style.setProperty('--c',p.color);av.innerHTML=face(p.emoji,p.photo);
-  const st=P?P.pc.connectionState:'new';
-  t.querySelector('.tl').textContent=nameOf(id)+(pr.mic===false?' 🔇':'')+(st==='connected'?'':st==='failed'?' · sem conexão':' · conectando…');
+  const st=P?P.pc.connectionState:'new';const stuck=P&&st!=='connected'&&Date.now()-P.t0>15000;
+  t.querySelector('.tl').textContent=nameOf(id)+(pr.mic===false?' 🔇':'')+(st==='connected'?'':st==='failed'||stuck?' · a rede bloqueou a conexão':' · conectando…');
  }
  renderCallInfo();
 }
