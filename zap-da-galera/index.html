@@ -30,9 +30,9 @@ body{background:var(--bg);color:var(--ink);font:15px/1.45 Inter,system-ui,-apple
 button,input,textarea{font:inherit;color:inherit}
 button{cursor:pointer;border:0;background:none}
 :focus-visible{outline:2px solid rgb(var(--accent-soft));outline-offset:2px}
-.app{display:grid;grid-template-columns:minmax(280px,380px) 1fr;height:100dvh}
-aside{border-right:1px solid var(--line);display:flex;flex-direction:column;background:rgb(18 21 34/.7)}
-main{display:flex;flex-direction:column;position:relative}
+.app{display:grid;grid-template-columns:minmax(280px,380px) 1fr;height:100dvh;overflow:hidden}
+aside{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;overflow:hidden;background:rgb(18 21 34/.7)}
+main{display:flex;flex-direction:column;position:relative;min-height:0;min-width:0;overflow:hidden}
 .top{display:flex;align-items:center;gap:10px;padding:12px 14px;padding-top:max(12px,env(safe-area-inset-top));border-bottom:1px solid var(--line);background:rgb(11 13 20/.85);min-height:64px}
 .brand{font-weight:800;font-size:20px;letter-spacing:-.02em;flex:1}
 .brand span{color:rgb(var(--accent-soft))}
@@ -175,6 +175,7 @@ label.f{display:grid;gap:5px;font-size:13px;color:var(--mute)}
 .light.on{display:grid}.light img{max-width:100%;max-height:100%;border-radius:8px}.light span{position:absolute;top:14px;right:18px;font-size:22px;color:#fff}
 .q[data-jump]{cursor:pointer}
 [hidden]{display:none!important}
+.saved{display:grid;gap:6px}.saved small{color:var(--mute)}.saved .chips button{width:auto;height:auto;font-size:15px;padding:8px 12px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-weight:600}
 .call{position:fixed;inset:0;z-index:80;background:#06070c;display:none;flex-direction:column;color:#fff}
 .call.on{display:flex}
 .ctop{display:flex;align-items:center;gap:10px;padding:12px 14px;padding-top:max(12px,env(safe-area-inset-top))}
